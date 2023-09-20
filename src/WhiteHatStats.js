@@ -38,6 +38,7 @@ export default function WhiteHatStats(props){
             plotData.push(entry)
         }
 
+
         //get transforms for each value into x and y coordinates
         let xScale = d3.scaleLinear()
             .domain(d3.extent(plotData,d=>d.easeOfDrawing))
@@ -63,56 +64,79 @@ export default function WhiteHatStats(props){
         }
         
         //scale color by gender ratio for no reason
-        let colorScale = d3.scaleDiverging()
-            .domain([0,.5,1])
-            .range(['magenta','white','navy']);
+        let colorScale = d3.scaleSequential(d3.interpolateViridis)
+            .domain([0,1])
+        
+        // Use area instead of radius for encoding gun deaths
+        // Create a bar plot
+        const barWidth = (width - 2 * margin) / plotData.length;
 
-        //draw the circles for each state
-        svg.selectAll('.dot').remove();
-        svg.selectAll('.dot').data(plotData)
-            .enter().append('circle')
-            .attr('cy',d=> yScale(d.count))
-            .attr('cx',d=>xScale(d.easeOfDrawing))
-            .attr('fill',d=> colorScale(d.genderRatio))
-            .attr('r',10)
-            .on('mouseover',(e,d)=>{
-                let string = d.name + '</br>'
-                    + 'Gun Deaths: ' + d.count + '</br>'
-                    + 'Difficulty Drawing: ' + d.easeOfDrawing;
-                props.ToolTip.moveTTipEvent(tTip,e)
-                tTip.html(string)
-            }).on('mousemove',(e)=>{
-                props.ToolTip.moveTTipEvent(tTip,e);
-            }).on('mouseout',(e,d)=>{
+        svg.selectAll('.bar').remove();
+        svg.selectAll('.bar')
+            .data(plotData)
+            .enter().append('rect')
+            .attr('class', 'bar')
+            .attr('x', (d, i) => margin + i * barWidth)
+            .attr('y', d => yScale(d.count))
+            .attr('width', barWidth - 1)
+            .attr('height', d => height - margin - yScale(d.count))
+            .attr('fill', d => colorScale(d.genderRatio))
+            .on('mouseover', (e, d) => {
+                // Tooltip code
+                let string = `${d.name}<br>Gun Deaths: ${d.count}`;
+                props.ToolTip.moveTTipEvent(tTip, e);
+                tTip.html(string);
+            })
+            .on('mousemove', (e) => {
+                props.ToolTip.moveTTipEvent(tTip, e);
+            })
+            .on('mouseout', (e, d) => {
                 props.ToolTip.hideTTip(tTip);
             });
-           
-        //draw the line
-        svg.selectAll('.regressionLine').remove();
-        svg.append('path').attr('class','regressionLine')
-            .attr('d',d3.line().curve(d3.curveBasis)(regressionLine))
-            .attr('stroke-width',5)
-            .attr('stroke','black')
-            .attr('fill','none');
 
-        //change the title
-        const labelSize = margin/2;
-        svg.selectAll('text').remove();
+        // Add x-axis with state names
+        const xAxis = d3.axisBottom(xScale)
+            .tickValues(plotData.map((d, i) => margin + i * barWidth + barWidth / 2))
+            .tickFormat((d, i) => plotData[i].name);
+
+        svg.append('g')
+            .attr('transform', `translate(0,${height - margin})`)
+            .call(xAxis)
+            .selectAll("text")
+            .style("text-anchor", "end")
+            .attr("dx", "-.8em")
+            .attr("dy", ".15em")
+            .attr("transform", "rotate(-65)");
+
+        // Add y-axis
+        const yAxis = d3.axisLeft(yScale);
+        svg.append('g')
+            .attr('transform', `translate(${margin},0)`)
+            .call(yAxis);
+
+        // Add x-axis label
         svg.append('text')
-            .attr('x',width/2)
-            .attr('y',labelSize)
-            .attr('text-anchor','middle')
-            .attr('font-size',labelSize)
-            .attr('font-weight','bold')
-            .text('How Hard it Is To Draw Each State Vs Gun Deaths');
+            .attr('x', width / 2)
+            .attr('y', height - 10)
+            .attr('text-anchor', 'middle')
+            .attr('font-size', 14)
+            .text('State');
 
+        // Add y-axis label
+        svg.append('text')
+            .attr('x', -(height / 2))
+            .attr('y', 10)
+            .attr('text-anchor', 'middle')
+            .attr('font-size', 14)
+            .attr('transform', 'rotate(-90)')
+            .text('Gun Deaths');
         //change the disclaimer here
         svg.append('text')
             .attr('x',width-20)
             .attr('y',height/3)
             .attr('text-anchor','end')
             .attr('font-size',10)
-            .text("I'm just asking questions");
+            .text("Data scaled by population and represented ethically");
 
         //draw basic axes using the x and y scales
         svg.selectAll('g').remove()
